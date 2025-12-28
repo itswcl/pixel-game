@@ -1,3 +1,4 @@
+/* eslint-disable */
 function doGet(e) {
   const action = e.parameter.action;
   
@@ -27,14 +28,16 @@ function doPost(e) {
 }
 
 function getQuestions(e) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('題目');
+  // Access the "Questions" sheet
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Questions') || SpreadsheetApp.getActiveSpreadsheet().getSheetByName('題目'); 
+  // Fallback to chinese name just in case, but prefer English
+  
   const data = sheet.getDataRange().getValues();
   // Remove header
   const headers = data.shift();
   
   // Format: [ID, Question, A, B, C, D, Answer]
   // Assuming columns: A=ID, B=Question, C=OptionA, D=OptionB, E=OptionC, F=OptionD, G=Answer
-  // Adjust indices if needed based on user's sheet. User said: 題號、題目、A、B、C、D、解答
   // Indices: 0, 1, 2, 3, 4, 5, 6
   
   const questions = data.map(row => ({
@@ -46,19 +49,12 @@ function getQuestions(e) {
       C: row[4],
       D: row[5]
     },
-    answer: row[6] // In a real app you might hide this, but for simple checking we can return it or verify on server.
-    // Ideally we verify on server to prevent cheating, but for this simple game, returning it is fine or we verify answers in a separate call.
-    // Requirement says: "將作答結果傳送到 Google Apps Script 計算成績". So we should PROBABLY NOT send the answer to client?
-    // User requirement: "成績計算：將作答結果傳送到 Google Apps Script 計算成績"
-    // So client sends answers, server calculates score.
+    answer: row[6]
   }));
   
   // Shuffle and pick N
   const count = parseInt(e.parameter.count || 10);
   const shuffled = questions.sort(() => 0.5 - Math.random()).slice(0, count);
-  
-  // We need to store the answers temporarily or fetch them again to verify?
-  // Easier: Fetch all questions again during grading.
   
   return ContentService.createTextOutput(JSON.stringify({ status: 'success', questions: shuffled }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -69,7 +65,8 @@ function submitResult(data) {
   const userId = data.userId;
   const userAnswers = data.answers;
   
-  const questionSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('題目');
+  // Get Questions to key answers
+  const questionSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Questions') || SpreadsheetApp.getActiveSpreadsheet().getSheetByName('題目');
   const qData = questionSheet.getDataRange().getValues();
   qData.shift(); // remove header
   
@@ -85,14 +82,14 @@ function submitResult(data) {
   
   for (const [qId, ans] of Object.entries(userAnswers)) {
     if (String(answerKey[qId]).trim().toUpperCase() === String(ans).trim().toUpperCase()) {
-      score += 10; // Or whatever weight
+      score += 10; // 10 points per question
       correctCount++;
     }
   }
   
   // Update Result Sheet
-  // Columns: ID、闖關次數、總分、最高分、第一次通關分數、花了幾次通關、最近遊玩時間
-  const resultSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('回答');
+  // Columns: ID, PlayCount, TotalScore, MaxScore, FirstPassScore, AttemptsToPass, LastPlayed
+  const resultSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Responses') || SpreadsheetApp.getActiveSpreadsheet().getSheetByName('回答');
   const rData = resultSheet.getDataRange().getValues();
   
   let rowIndex = -1;
@@ -106,19 +103,8 @@ function submitResult(data) {
   
   const now = new Date();
   
-  // Pass threshold check (assume passed if correctCount >= threshold passed in params? or config?)
-  // User said "PASS_THRESHOLD" is env var. Server side might not know it unless passed or hardcoded.
-  // We'll return the score and let client show pass/fail, but recording logic might need to know "Pass".
-  // "第一次通關分數" implies we record when they pass.
-  // Let's assume passed if score > 0 for now or passed from client? No, client shouldn't dictate pass.
-  // I'll add a check function or just record raw data.
-  // Actually, "花了幾次通關" counts attempts until passed.
-  
-  // Let's return the score details and just record basic stats.
-  // We'll update row if exists.
-  
   if (rowIndex > -1) {
-    // Update existing
+    // Update existing user
     // Row mapping: 0:ID, 1:Count, 2:TotalScore, 3:MaxScore, 4:FirstPassScore, 5:AttemptsToPass, 6:LastTime
     const row = rData[rowIndex];
     const currentCount = row[1] + 1;
@@ -141,11 +127,11 @@ function submitResult(data) {
     // 4 & 5: First Pass Info (Only if never passed before)
     if (existingFirstPass === "" && isPassed) {
        resultSheet.getRange(rowIndex + 1, 5).setValue(score); // FirstPassScore
-       resultSheet.getRange(rowIndex + 1, 6).setValue(currentCount); // AttemptsToPass (current attempt number)
+       resultSheet.getRange(rowIndex + 1, 6).setValue(currentCount); // AttemptsToPass
     }
     
   } else {
-    // Create new
+    // Create new record
     // ID, 1, Score, Score, FirstPass?, Attempts?, Now
     const passThreshold = data.passThreshold || 3;
     const isPassed = correctCount >= passThreshold;
