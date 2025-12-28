@@ -32,6 +32,14 @@ function App() {
     handleStart(userId);
   };
 
+  const handleNewGame = () => {
+    setGameState('START');
+    setFinalScore(0);
+    setUserAnswers({});
+    setQuestions([]);
+    setUserId('');
+  };
+
   return (
     <div className="App">
       {gameState === 'START' && <StartScreen onStart={handleStart} />}
@@ -58,6 +66,7 @@ function App() {
           userId={userId} 
           answers={userAnswers}
           onRestart={handleRestart}
+          onNewGame={handleNewGame}
         />
       )}
     </div>

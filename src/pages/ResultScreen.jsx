@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { submitResult } from '../services/api';
 
-export default function ResultScreen({ score, totalQuestions, userId, answers, onRestart }) {
+export default function ResultScreen({ score, totalQuestions, userId, answers, onRestart, onNewGame }) {
   const [submitting, setSubmitting] = useState(true);
   const submittedRef = useRef(false); // Guard for StrictMode double-fire
 
@@ -66,9 +66,14 @@ export default function ResultScreen({ score, totalQuestions, userId, answers, o
           </div>
         )}
 
-        <button onClick={onRestart} className="pixel-btn">
-          TRY AGAIN
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={onRestart} className="pixel-btn" style={{ flex: 1 }}>
+            TRY AGAIN
+          </button>
+          <button onClick={onNewGame} className="pixel-btn" style={{ flex: 1, filter: 'grayscale(1)' }}>
+            NEW PLAYER
+          </button>
+        </div>
       </div>
     </div>
   );
